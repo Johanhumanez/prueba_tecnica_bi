@@ -1,0 +1,13 @@
+# Ignorar datasets grandes
+Data/Raw/
+Data/Processed/
+*.parquet
+*.csv
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+*.log
+*.tmp
