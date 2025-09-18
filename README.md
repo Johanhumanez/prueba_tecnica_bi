@@ -33,7 +33,6 @@
 
 -python etl.py
 
-El script genera los archivos procesados en Data/Processed/.
 
 # Modelado en Power BI
 
