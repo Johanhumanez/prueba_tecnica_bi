@@ -37,7 +37,7 @@
 # Modelado en Power BI
 
 1. Los datasets procesados se importan a Power BI.
-2. Se construye un modelo estrella con tablas fact (Invoices, Orders, Budget, Forecast) y dimensiones (Customers, Products, Regions, etc.).
+2. Se construye un modelo estrella con tablas fact (Invoices, Orders, Budget, Forecast) y dimensiones (Customers, Products, Regions,Products, Brands).
 3. Se implementan medidas DAX para análisis de ventas, presupuesto y desempeño.
 
 # Entregables 
