@@ -3,17 +3,19 @@ import os
 
 print("✅ Script ETL iniciado")
 
-# 📂 Rutas
-RAW_DIR = r"C:\Users\johan\OneDrive\Documentos\Documentos Johan\Pruebas de seleccion\Prueba_Tecnica_BI\Data\Raw"
+# 📂 Ruta donde tienes los datos RAW
+data_path = r"C:\Users\johan\OneDrive\Documentos\Documentos Johan\Pruebas de seleccion\Prueba_Tecnica_BI\Data\Raw"
+
+# 📂 Carpeta de salida
 OUTPUT_DIR = r"C:\Users\johan\OneDrive\Documentos\Documentos Johan\Pruebas de seleccion\Prueba_Tecnica_BI\Data\Processed"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Diccionario de tablas
+# Diccionario para guardar las tablas cargadas
 tables = {}
 
-# === 1. EXTRACCIÓN ===
-for file in os.listdir(RAW_DIR):
-    file_path = os.path.join(RAW_DIR, file)
+# 🚀 Cargar archivos CSV y Parquet
+for file in os.listdir(data_path):
+    file_path = os.path.join(data_path, file)
 
     if file.endswith(".csv"):
         try:
@@ -32,8 +34,7 @@ print("\n📊 Tablas disponibles:")
 for name in tables.keys():
     print("-", name)
 
-
-# === 2. TRANSFORMACIÓN ===
+# 🔧 Función de limpieza
 def clean_table(name, df):
     print(f"\n🔧 Limpiando tabla: {name}")
 
@@ -61,57 +62,48 @@ def clean_table(name, df):
             except:
                 pass
 
-    # === Corrección de negativos ===
+    # ✅ Corrección específica por tabla
     if name == "invoices":
-        for col in [
-            "net_invoice_quantity",
-            "net_invoice_price",
-            "net_invoice_value",
-            "delivery_cost",
-            "late_delivery_penalties",
-            "overdue_payment_penalties",
-            "taxes_&_commercial_fees",
-            "freight",
-            "net_invoice_cost",
-            "net_invoice_cogs"
-        ]:
+        for col in ["net_invoice_quantity", "net_invoice_price", "net_invoice_value"]:
             if col in df.columns:
-                df[col] = df[col].abs()
+                df[col] = df[col].astype(float).abs()
         print("   ✅ Corrección aplicada a valores negativos en Invoices")
 
     if name == "budget":
         if "total_budget" in df.columns:
-            df["total_budget"] = df["total_budget"].abs()
-        print("   ✅ Corrección aplicada a valores negativos en Budget")
+            df["total_budget"] = (
+                df["total_budget"]
+                .astype(str)
+                .str.replace(",", ".", regex=False)
+            )
+            df["total_budget"] = pd.to_numeric(df["total_budget"], errors="coerce").abs()
+        print("   ✅ Corrección aplicada a valores negativos y texto en Budget")
 
     if name == "forecast":
         if "forecast_(eur)" in df.columns:
-            df["forecast_(eur)"] = df["forecast_(eur)"].abs()
+            df["forecast_(eur)"] = pd.to_numeric(df["forecast_(eur)"], errors="coerce").abs()
         print("   ✅ Corrección aplicada a valores negativos en Forecast")
+
+    # Guardar archivo limpio
+    output_path = os.path.join(OUTPUT_DIR, f"{name}_clean.csv")
+    df.to_csv(output_path, index=False, encoding="utf-8")
+    print(f"   ✅ Guardado en {output_path}")
 
     return df
 
-
 # Procesar todas las tablas
+processed_tables = {}
 for name, df in tables.items():
-    cleaned_df = clean_table(name, df)
+    processed_tables[name] = clean_table(name, df)
 
-    # Guardar en carpeta Processed
-    output_path = os.path.join(OUTPUT_DIR, f"{name}_clean.csv")
-    cleaned_df.to_csv(output_path, index=False, encoding="utf-8")
-    print(f"   ✅ Guardado en {output_path}")
+# 📌 Verificación final de negativos en tablas clave
+print("\n📌 Verificación de mínimos y máximos (invoices, budget, forecast):")
+for key in ["invoices", "budget", "forecast"]:
+    fname = os.path.join(OUTPUT_DIR, f"{key}_clean.csv")
+    if os.path.exists(fname):
+        df = pd.read_csv(fname)
+        print(f"\n👉 {key}_clean.csv")
+        print("Mínimos:\n", df.min(numeric_only=True))
+        print("Máximos:\n", df.max(numeric_only=True))
 
-
-# === 3. VALIDACIÓN FINAL ===
-print("\n📌 Verificación de mínimos (para confirmar que no hay negativos):\n")
-for check in ["invoices_clean.csv", "budget_clean.csv", "forecast_clean.csv"]:
-    path = os.path.join(OUTPUT_DIR, check)
-    if os.path.exists(path):
-        df = pd.read_csv(path, encoding="utf-8")
-        print(f"👉 {check}")
-        print(df.min(numeric_only=True))
-        print()
-    else:
-        print(f"⚠️ No encontré {check} en Processed")
-
-print("✅ Script ETL finalizado correctamente")
+print("\n✅ Script ETL finalizado correctamente")
