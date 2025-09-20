@@ -1,21 +1,19 @@
 import pandas as pd
-print("✅ Script ETL ejecutado correctamente.")
-
-import pandas as pd
 import os
 
-# 📂 Ruta donde tienes los datos
+print("✅ Script ETL iniciado")
 
-data_path = r"C:\Users\johan\OneDrive\Documentos\Documentos Johan\Pruebas de seleccion\Prueba_Tecnica_BI\Data"
+# 📂 Rutas
+RAW_DIR = r"C:\Users\johan\OneDrive\Documentos\Documentos Johan\Pruebas de seleccion\Prueba_Tecnica_BI\Data\Raw"
+OUTPUT_DIR = r"C:\Users\johan\OneDrive\Documentos\Documentos Johan\Pruebas de seleccion\Prueba_Tecnica_BI\Data\Processed"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Diccionario para guardar las tablas
-
+# Diccionario de tablas
 tables = {}
 
-# Recorremos todos los archivos dentro de Data
-
-for file in os.listdir(data_path):
-    file_path = os.path.join(data_path, file)
+# === 1. EXTRACCIÓN ===
+for file in os.listdir(RAW_DIR):
+    file_path = os.path.join(RAW_DIR, file)
 
     if file.endswith(".csv"):
         try:
@@ -30,20 +28,12 @@ for file in os.listdir(data_path):
         tables[file.replace(".parquet", "")] = df
         print(f"✅ Cargado Parquet: {file} -> {df.shape}")
 
-
-    # Mostrar nombres de tablas cargadas
 print("\n📊 Tablas disponibles:")
 for name in tables.keys():
     print("-", name)
 
-    import os
-import pandas as pd
 
-# Carpeta de salida
-OUTPUT_DIR = "Processed"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-# Función de limpieza
+# === 2. TRANSFORMACIÓN ===
 def clean_table(name, df):
     print(f"\n🔧 Limpiando tabla: {name}")
 
@@ -57,13 +47,13 @@ def clean_table(name, df):
     if before != after:
         print(f"   ➖ {before - after} duplicados eliminados")
 
-    # Manejo de nulos (ejemplo: reemplazar por NA)
+    # Manejo de nulos
     nulls = df.isnull().sum().sum()
     if nulls > 0:
         print(f"   ⚠️ {nulls} valores nulos detectados")
-        df = df.fillna("NA")  # aquí puedes personalizar por columna
+        df = df.fillna("NA")
 
-    # Intento de conversión de fechas (si existen columnas con 'date')
+    # Conversión de fechas
     for col in df.columns:
         if "date" in col or "fecha" in col:
             try:
@@ -71,15 +61,57 @@ def clean_table(name, df):
             except:
                 pass
 
+    # === Corrección de negativos ===
+    if name == "invoices":
+        for col in [
+            "net_invoice_quantity",
+            "net_invoice_price",
+            "net_invoice_value",
+            "delivery_cost",
+            "late_delivery_penalties",
+            "overdue_payment_penalties",
+            "taxes_&_commercial_fees",
+            "freight",
+            "net_invoice_cost",
+            "net_invoice_cogs"
+        ]:
+            if col in df.columns:
+                df[col] = df[col].abs()
+        print("   ✅ Corrección aplicada a valores negativos en Invoices")
+
+    if name == "budget":
+        if "total_budget" in df.columns:
+            df["total_budget"] = df["total_budget"].abs()
+        print("   ✅ Corrección aplicada a valores negativos en Budget")
+
+    if name == "forecast":
+        if "forecast_(eur)" in df.columns:
+            df["forecast_(eur)"] = df["forecast_(eur)"].abs()
+        print("   ✅ Corrección aplicada a valores negativos en Forecast")
+
     return df
 
-# Procesar todas las tablas y guardarlas limpias
+
+# Procesar todas las tablas
 for name, df in tables.items():
     cleaned_df = clean_table(name, df)
 
-    # Guardar en CSV limpio
+    # Guardar en carpeta Processed
     output_path = os.path.join(OUTPUT_DIR, f"{name}_clean.csv")
     cleaned_df.to_csv(output_path, index=False, encoding="utf-8")
     print(f"   ✅ Guardado en {output_path}")
 
-    
+
+# === 3. VALIDACIÓN FINAL ===
+print("\n📌 Verificación de mínimos (para confirmar que no hay negativos):\n")
+for check in ["invoices_clean.csv", "budget_clean.csv", "forecast_clean.csv"]:
+    path = os.path.join(OUTPUT_DIR, check)
+    if os.path.exists(path):
+        df = pd.read_csv(path, encoding="utf-8")
+        print(f"👉 {check}")
+        print(df.min(numeric_only=True))
+        print()
+    else:
+        print(f"⚠️ No encontré {check} en Processed")
+
+print("✅ Script ETL finalizado correctamente")
